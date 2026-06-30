@@ -1,12 +1,18 @@
 <?php
 /**
  * ValidationUtility.php
- * Funciones de validación de datos de entrada del formulario (ORIGINAL, intacto)
- * + capa de auditoría/firma digital para el módulo de reportes (AJUSTADA al
- * esquema real de la tabla `inscriptores`: nombre, apellido, edad, sexo,
- * correo, celular — no existe campo de identificación en la BD).
+ *
+ * VERSIÓN FUSIONADA:
+ *   ✔ Tu clase original conservada intacta (todos los métodos, firma, lógica).
+ *   ✚ Métodos nuevos AGREGADOS al final de cada sección:
+ *       - isValidNombreTitulo()  → valida formato Título (Title Case).
+ *       - isValidApellido()      → alias semántico de isValidNombre().
+ *       - isValidAreas()         → valida selección de áreas de interés (FK).
+ *       - validateForm() extendido con bloques opcionales para id_pais y areas[].
+ *
+ *   La sección de auditoría/firma digital (sanitize, validateRecord, signRecord,
+ *   verifySignature, auditStatus) se conserva exactamente como la tenías.
  */
-
 class ValidationUtility
 {
     // =========================================================
@@ -27,10 +33,54 @@ class ValidationUtility
 
     /**
      * Valida que el nombre/apellido solo contenga letras (incluye tildes y ñ) y espacios.
+     * (Tu validación original — conservada sin cambios.)
      */
     public static function isValidNombre(string $nombre): bool
     {
         return (bool) preg_match('/^[A-Za-zÁÉÍÓÚáéíóúÑñÜü\s]{2,100}$/u', $nombre);
+    }
+
+    /**
+     * ✚ NUEVO — Alias semántico de isValidNombre() para mayor claridad en el código
+     * del formulario cuando se valida específicamente el campo "apellido".
+     * Aplica exactamente las mismas reglas; no rompe ningún código existente.
+     */
+    public static function isValidApellido(string $apellido): bool
+    {
+        return self::isValidNombre($apellido);
+    }
+
+    /**
+     * ✚ NUEVO — Valida formato Título (Title Case): cada palabra debe iniciar
+     * con mayúscula, admite letras con tilde, ñ y guiones entre palabras.
+     *
+     * Ejemplo válido  : "María José", "De La Cruz"
+     * Ejemplo inválido: "maría josé" / "MARÍA JOSÉ"
+     *
+     * Úsalo cuando el formulario requiera este formato estricto.
+     * Tu isValidNombre() original sigue disponible para validación básica.
+     */
+    public static function isValidNombreTitulo(string $nombre): bool
+    {
+        $nombre = trim($nombre);
+        if ($nombre === '' || mb_strlen($nombre, 'UTF-8') < 2 || mb_strlen($nombre, 'UTF-8') > 100) {
+            return false;
+        }
+        // Divide por espacio o guion y evalúa cada palabra
+        $palabras = preg_split('/[\s\-]+/u', $nombre);
+        foreach ($palabras as $palabra) {
+            if ($palabra === '') {
+                continue;
+            }
+            $primeraLetra = mb_substr($palabra, 0, 1, 'UTF-8');
+            if (mb_strtoupper($primeraLetra, 'UTF-8') !== $primeraLetra) {
+                return false;
+            }
+            if (!preg_match('/^[\p{L}\'-]+$/u', $palabra)) {
+                return false;
+            }
+        }
+        return true;
     }
 
     /**
@@ -90,6 +140,24 @@ class ValidationUtility
     }
 
     /**
+     * ✚ NUEVO — Valida que se haya seleccionado al menos un área de interés
+     * (FK a la tabla `areas_interes`) y que todos los valores sean enteros positivos.
+     * Complementa isValidTemas() para el formulario con <select multiple>.
+     */
+    public static function isValidAreas($areas): bool
+    {
+        if (!is_array($areas) || count($areas) === 0) {
+            return false;
+        }
+        foreach ($areas as $id) {
+            if (!is_numeric($id) || (int) $id <= 0) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
      * Valida observaciones (campo opcional, longitud máxima).
      */
     public static function isValidObservaciones(string $observaciones): bool
@@ -101,12 +169,20 @@ class ValidationUtility
      * Ejecuta todas las validaciones sobre el arreglo de datos del formulario.
      * Retorna un arreglo de errores (vacío si todo es válido).
      *
+     * ✚ EXTENSIÓN: se agregaron bloques opcionales al final para validar
+     *   `id_pais`  (ID entero, FK a tabla `paises`) y
+     *   `areas[]`  (arreglo de IDs, FK a tabla `areas_interes`).
+     *   Son opcionales: solo se validan si las claves están presentes en $data,
+     *   de modo que tu formulario actual no se ve afectado si no los envía.
+     *
      * NOTA: si tu formulario actual no captura "identidad", elimina o ignora
      * ese bloque para que coincida con los campos reales que envíes por POST.
      */
     public static function validateForm(array $data): array
     {
         $errors = [];
+
+        // ---- Campos originales (tu lógica sin cambios) ----
 
         if (isset($data['identidad']) && (empty($data['identidad']) || !self::isValidIdentidad($data['identidad']))) {
             $errors['identidad'] = 'La identidad ingresada no es válida.';
@@ -150,6 +226,24 @@ class ValidationUtility
 
         if (isset($data['observaciones']) && !self::isValidObservaciones($data['observaciones'])) {
             $errors['observaciones'] = 'Las observaciones no deben superar 1000 caracteres.';
+        }
+
+        // ---- ✚ Bloques nuevos (opcionales, no afectan formularios existentes) ----
+
+        // Valida ID de país cuando el formulario usa <select> dinámico (tabla paises).
+        // Solo se activa si la clave 'id_pais' está presente en $data.
+        if (array_key_exists('id_pais', $data)) {
+            if (empty($data['id_pais']) || !is_numeric($data['id_pais']) || (int) $data['id_pais'] <= 0) {
+                $errors['id_pais'] = 'Seleccione un país de residencia válido.';
+            }
+        }
+
+        // Valida áreas de interés cuando el formulario usa <select multiple> (tabla areas_interes).
+        // Solo se activa si la clave 'areas' está presente en $data.
+        if (array_key_exists('areas', $data)) {
+            if (!self::isValidAreas($data['areas'])) {
+                $errors['areas'] = 'Seleccione al menos un área de interés.';
+            }
         }
 
         return $errors;

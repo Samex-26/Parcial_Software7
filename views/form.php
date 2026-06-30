@@ -1,34 +1,33 @@
 <?php
 /**
- * form.php (Versión Combinada - PHP arriba, HTML abajo)
- * Vista principal y diseño incrustado.
+ * views/form.php (Versión Combinada Completa)
+ * Vista del formulario de inscripción a iTECH con estilos CSS incrustados.
+ * * LÓGICA DE NEGOCIO (PHP ARRIBA)
  */
-require_once __DIR__ . '/../controllers/FormController.php';
-require_once __DIR__ . '/../models/UserModel.php';
-require_once __DIR__ . '/../utilities/SecurityUtility.php';
 
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
+if (!defined('ITECH_APP')) {
+    header('Location: ../index.php');
+    exit;
 }
 
-$result = ['success' => false, 'errors' => [], 'message' => '', 'old' => []];
-$userModel = new UserModel();
-
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $controller = new FormController();
-    $result = $controller->handleSubmit($_POST);
+/**
+ * Devuelve el valor anterior escapado, o '' si no existe.
+ */
+function old(array $old, string $key): string
+{
+    return htmlspecialchars($old[$key] ?? '', ENT_QUOTES | ENT_HTML5, 'UTF-8');
 }
 
-$errors = $result['errors'];
-$old    = $result['old'];
-$temasDisponibles = $userModel->getTemas();
-$csrfToken = SecurityUtility::generateCsrfToken();
-
-if (!function_exists('old')) {
-    function old(array $old, string $key): string
-    {
-        return SecurityUtility::escapeOutput($old[$key] ?? '');
+/**
+ * Renderiza un mensaje de error de campo si existe.
+ */
+function fieldError(array $errors, string $key): string
+{
+    if (empty($errors[$key])) {
+        return '';
     }
+    $msg = htmlspecialchars($errors[$key], ENT_QUOTES | ENT_HTML5, 'UTF-8');
+    return "<div class=\"field-error\">⚠ {$msg}</div>";
 }
 ?>
 <!DOCTYPE html>
@@ -36,72 +35,89 @@ if (!function_exists('old')) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Inscripción - iTECH</title>
+    <title>Formulario de Inscripción — iTECH</title>
     <style>
-        /* ===========================================================
-           Estilos integrados del formulario de inscripción iTECH
-           =========================================================== */
+        /* ============================================================
+           Estilos globales integrados del proyecto iTECH 
+           ============================================================ */
+
+        /* ---- Variables de diseño ---- */
         :root {
-            --color-primary: #0d6efd;
-            --color-primary-dark: #0b5ed7;
-            --color-secondary: #6c757d;
-            --color-success: #198754;
-            --color-error: #dc3545;
-            --color-bg: #f4f6f9;
-            --color-card: #ffffff;
-            --color-text: #212529;
-            --color-border: #ced4da;
+            --color-primary:       #0d6efd;
+            --color-primary-dark:  #0b5ed7;
+            --color-success:       #198754;
+            --color-success-bg:    #d1e7dd;
+            --color-error:         #dc3545;
+            --color-error-bg:      #f8d7da;
+            --color-warning:       #664d03;
+            --color-warning-bg:    #fff3cd;
+            --color-bg:            #f4f6f9;
+            --color-card:          #ffffff;
+            --color-text:          #212529;
+            --color-muted:         #6c757d;
+            --color-border:        #ced4da;
+            --radius:              8px;
         }
 
-        * {
+        /* ---- Reset básico ---- */
+        *, *::before, *::after {
             box-sizing: border-box;
+            margin: 0;
+            padding: 0;
         }
 
         body {
-            margin: 0;
             font-family: 'Segoe UI', Arial, sans-serif;
             background-color: var(--color-bg);
             color: var(--color-text);
             display: flex;
             flex-direction: column;
             min-height: 100vh;
+            line-height: 1.6;
         }
 
+        /* ---- Header ---- */
         header.site-header {
             background-color: var(--color-primary);
-            color: #fff;
-            padding: 1.5rem 1rem;
+            color: #ffffff;
+            padding: 1.2rem 2rem;
             text-align: center;
         }
 
         header.site-header h1 {
-            margin: 0;
-            font-size: 1.6rem;
+            font-size: 1.5rem;
+            font-weight: 700;
+            letter-spacing: 0.02em;
         }
 
+        /* ---- Main ---- */
         main {
             flex: 1;
             display: flex;
             justify-content: center;
-            padding: 2rem 1rem;
+            align-items: flex-start;
+            padding: 2.5rem 1rem;
         }
 
+        /* ---- Tarjeta del formulario ---- */
         .form-card {
             background-color: var(--color-card);
-            border-radius: 10px;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
-            padding: 2rem;
+            border-radius: 12px;
+            box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+            padding: 2.2rem 2rem;
             width: 100%;
-            max-width: 700px;
+            max-width: 740px;
         }
 
         .form-card h2 {
-            margin-top: 0;
             color: var(--color-primary);
             border-bottom: 2px solid var(--color-primary);
             padding-bottom: 0.5rem;
+            margin-bottom: 1.5rem;
+            font-size: 1.25rem;
         }
 
+        /* ---- Grupos de campo ---- */
         .form-group {
             margin-bottom: 1.1rem;
         }
@@ -110,8 +126,23 @@ if (!function_exists('old')) {
             display: block;
             font-weight: 600;
             margin-bottom: 0.3rem;
+            font-size: 0.92rem;
         }
 
+        /* Texto de ayuda junto al label */
+        .hint {
+            font-weight: 400;
+            color: var(--color-muted);
+            font-size: 0.78rem;
+        }
+
+        /* Asterisco de campo obligatorio */
+        .req {
+            color: var(--color-error);
+            margin-left: 2px;
+        }
+
+        /* Inputs, selects y textarea */
         .form-group input[type="text"],
         .form-group input[type="number"],
         .form-group input[type="email"],
@@ -119,10 +150,36 @@ if (!function_exists('old')) {
         .form-group select,
         .form-group textarea {
             width: 100%;
-            padding: 0.55rem 0.7rem;
+            padding: 0.55rem 0.75rem;
             border: 1px solid var(--color-border);
-            border-radius: 6px;
-            font-size: 0.95rem;
+            border-radius: var(--radius);
+            font-size: 0.93rem;
+            background-color: #fdfdfd;
+            transition: border-color 0.15s;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus,
+        .form-group textarea:focus {
+            outline: none;
+            border-color: var(--color-primary);
+            box-shadow: 0 0 0 3px rgba(13, 110, 253, 0.15);
+        }
+
+        /* Select múltiple — áreas de interés */
+        .select-multiple {
+            min-height: 150px;
+            padding: 0.4rem;
+        }
+
+        .select-multiple option {
+            padding: 0.3rem 0.5rem;
+            border-radius: 4px;
+        }
+
+        .select-multiple option:checked {
+            background: var(--color-primary);
+            color: #ffffff;
         }
 
         .form-group textarea {
@@ -130,6 +187,7 @@ if (!function_exists('old')) {
             min-height: 90px;
         }
 
+        /* Fila de dos columnas */
         .form-row {
             display: flex;
             gap: 1rem;
@@ -139,218 +197,229 @@ if (!function_exists('old')) {
             flex: 1;
         }
 
-        .checkbox-group {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 0.4rem 1rem;
-            border: 1px solid var(--color-border);
-            border-radius: 6px;
-            padding: 0.8rem;
-        }
-
-        .checkbox-item {
-            display: flex;
-            align-items: center;
-            gap: 0.4rem;
-        }
-
-        .checkbox-item input {
-            width: auto;
-        }
-
+        /* ---- Errores por campo ---- */
         .field-error {
             color: var(--color-error);
-            font-size: 0.82rem;
+            font-size: 0.80rem;
             margin-top: 0.25rem;
         }
 
+        /* ---- Alertas globales ---- */
         .alert {
-            padding: 0.8rem 1rem;
-            border-radius: 6px;
-            margin-bottom: 1rem;
-            font-size: 0.95rem;
+            padding: 0.75rem 1rem;
+            border-radius: var(--radius);
+            margin-bottom: 1.2rem;
+            font-size: 0.92rem;
         }
 
         .alert-success {
-            background-color: #d1e7dd;
+            background-color: var(--color-success-bg);
             color: var(--color-success);
             border: 1px solid #badbcc;
         }
 
         .alert-error {
-            background-color: #f8d7da;
+            background-color: var(--color-error-bg);
             color: var(--color-error);
             border: 1px solid #f5c2c7;
         }
 
+        /* ---- Botón principal ---- */
         .btn-submit {
-            background-color: var(--color-primary);
-            color: #fff;
-            border: none;
-            padding: 0.75rem 1.5rem;
-            border-radius: 6px;
-            font-size: 1rem;
-            cursor: pointer;
+            display: block;
             width: 100%;
-            transition: background-color 0.2s ease-in-out;
+            background-color: var(--color-primary);
+            color: #ffffff;
+            border: none;
+            padding: 0.8rem 1.5rem;
+            border-radius: var(--radius);
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            margin-top: 0.5rem;
+            transition: background-color 0.2s;
         }
 
         .btn-submit:hover {
             background-color: var(--color-primary-dark);
         }
 
+        /* ---- Footer ---- */
         footer.site-footer {
             background-color: #212529;
             color: #ced4da;
             text-align: center;
             padding: 1rem;
-            font-size: 0.85rem;
+            font-size: 0.83rem;
+        }
+
+        /* ---- Responsive ---- */
+        @media (max-width: 560px) {
+            .form-row {
+                flex-direction: column;
+                gap: 0;
+            }
+
+            .form-card {
+                padding: 1.4rem 1rem;
+            }
         }
     </style>
 </head>
 <body>
 
 <header class="site-header">
-    <h1>Formulario de Inscripción a Temas Tecnológicos</h1>
+    <h1>iTECH — Formulario de Inscripción</h1>
 </header>
 
 <main>
     <div class="form-card">
         <h2>Datos del Inscriptor</h2>
 
-        <?php if (!empty($result['message'])): ?>
-            <div class="alert alert-success"><?= SecurityUtility::escapeOutput($result['message']) ?></div>
+        <?php if (!empty($errors['csrf'])): ?>
+            <div class="alert alert-error">
+                <?= htmlspecialchars($errors['csrf'], ENT_QUOTES, 'UTF-8') ?>
+            </div>
         <?php endif; ?>
 
         <?php if (!empty($errors['general'])): ?>
-            <div class="alert alert-error"><?= SecurityUtility::escapeOutput($errors['general']) ?></div>
-        <?php endif; ?>
-
-        <?php if (!empty($errors['csrf'])): ?>
-            <div class="alert alert-error"><?= SecurityUtility::escapeOutput($errors['csrf']) ?></div>
-        <?php endif; ?>
-
-        <form method="POST" action="form.php" novalidate>
-            <input type="hidden" name="csrf_token" value="<?= SecurityUtility::escapeOutput($csrfToken) ?>">
-
-            <div class="form-group">
-                <label for="identidad">Identidad / Cédula</label>
-                <input type="text" id="identidad" name="identidad" value="<?= old($old, 'identidad') ?>" required>
-                <?php if (!empty($errors['identidad'])): ?>
-                    <div class="field-error"><?= SecurityUtility::escapeOutput($errors['identidad']) ?></div>
-                <?php endif; ?>
+            <div class="alert alert-error">
+                <?= htmlspecialchars($errors['general'], ENT_QUOTES, 'UTF-8') ?>
             </div>
+        <?php endif; ?>
+
+        <form method="POST" action="index.php?action=form" novalidate>
+
+            <input type="hidden" name="csrf_token"
+                   value="<?= htmlspecialchars($csrf, ENT_QUOTES, 'UTF-8') ?>">
 
             <div class="form-row">
                 <div class="form-group">
-                    <label for="nombre">Nombre</label>
-                    <input type="text" id="nombre" name="nombre" value="<?= old($old, 'nombre') ?>" required>
-                    <?php if (!empty($errors['nombre'])): ?>
-                        <div class="field-error"><?= SecurityUtility::escapeOutput($errors['nombre']) ?></div>
-                    <?php endif; ?>
+                    <label for="nombre">Nombre <span class="req">*</span></label>
+                    <input type="text" id="nombre" name="nombre"
+                           value="<?= old($old, 'nombre') ?>"
+                           placeholder="Ej: Juan Carlos"
+                           required>
+                    <?= fieldError($errors, 'nombre') ?>
                 </div>
+
                 <div class="form-group">
-                    <label for="apellido">Apellido</label>
-                    <input type="text" id="apellido" name="apellido" value="<?= old($old, 'apellido') ?>" required>
-                    <?php if (!empty($errors['apellido'])): ?>
-                        <div class="field-error"><?= SecurityUtility::escapeOutput($errors['apellido']) ?></div>
-                    <?php endif; ?>
+                    <label for="apellido">Apellido <span class="req">*</span></label>
+                    <input type="text" id="apellido" name="apellido"
+                           value="<?= old($old, 'apellido') ?>"
+                           placeholder="Ej: Pérez González"
+                           required>
+                    <?= fieldError($errors, 'apellido') ?>
                 </div>
             </div>
 
             <div class="form-row">
                 <div class="form-group">
-                    <label for="edad">Edad</label>
-                    <input type="number" id="edad" name="edad" min="1" max="120" value="<?= old($old, 'edad') ?>" required>
-                    <?php if (!empty($errors['edad'])): ?>
-                        <div class="field-error"><?= SecurityUtility::escapeOutput($errors['edad']) ?></div>
-                    <?php endif; ?>
+                    <label for="edad">Edad <span class="req">*</span></label>
+                    <input type="number" id="edad" name="edad"
+                           value="<?= old($old, 'edad') ?>"
+                           min="1" max="120" placeholder="Ej: 25"
+                           required>
+                    <?= fieldError($errors, 'edad') ?>
                 </div>
+
                 <div class="form-group">
-                    <label for="sexo">Sexo</label>
+                    <label for="sexo">Sexo <span class="req">*</span></label>
                     <?php $sexoOld = $old['sexo'] ?? ''; ?>
                     <select id="sexo" name="sexo" required>
                         <option value="">Seleccione...</option>
-                        <option value="M" <?= $sexoOld === 'M' ? 'selected' : '' ?>>Masculino</option>
-                        <option value="F" <?= $sexoOld === 'F' ? 'selected' : '' ?>>Femenino</option>
-                        <option value="Otro" <?= $sexoOld === 'Otro' ? 'selected' : '' ?>>Otro</option>
+                        <option value="Masculino" <?= $sexoOld === 'Masculino' ? 'selected' : '' ?>>Masculino</option>
+                        <option value="Femenino"  <?= $sexoOld === 'Femenino'  ? 'selected' : '' ?>>Femenino</option>
+                        <option value="Otro"      <?= $sexoOld === 'Otro'      ? 'selected' : '' ?>>Otro</option>
                     </select>
-                    <?php if (!empty($errors['sexo'])): ?>
-                        <div class="field-error"><?= SecurityUtility::escapeOutput($errors['sexo']) ?></div>
-                    <?php endif; ?>
-                </div>
-            </div>
-
-            <div class="form-row">
-                <div class="form-group">
-                    <label for="pais_residencia">País de Residencia</label>
-                    <input type="text" id="pais_residencia" name="pais_residencia" value="<?= old($old, 'pais_residencia') ?>" required>
-                    <?php if (!empty($errors['pais_residencia'])): ?>
-                        <div class="field-error"><?= SecurityUtility::escapeOutput($errors['pais_residencia']) ?></div>
-                    <?php endif; ?>
-                </div>
-                <div class="form-group">
-                    <label for="nacionalidad">Nacionalidad</label>
-                    <input type="text" id="nacionalidad" name="nacionalidad" value="<?= old($old, 'nacionalidad') ?>" required>
-                    <?php if (!empty($errors['nacionalidad'])): ?>
-                        <div class="field-error"><?= SecurityUtility::escapeOutput($errors['nacionalidad']) ?></div>
-                    <?php endif; ?>
-                </div>
-            </div>
-
-            <div class="form-row">
-                <div class="form-group">
-                    <label for="correo">Correo Electrónico</label>
-                    <input type="email" id="correo" name="correo" value="<?= old($old, 'correo') ?>" required>
-                    <?php if (!empty($errors['correo'])): ?>
-                        <div class="field-error"><?= SecurityUtility::escapeOutput($errors['correo']) ?></div>
-                    <?php endif; ?>
-                </div>
-                <div class="form-group">
-                    <label for="celular">Celular</label>
-                    <input type="tel" id="celular" name="celular" value="<?= old($old, 'celular') ?>" required>
-                    <?php if (!empty($errors['celular'])): ?>
-                        <div class="field-error"><?= SecurityUtility::escapeOutput($errors['celular']) ?></div>
-                    <?php endif; ?>
+                    <?= fieldError($errors, 'sexo') ?>
                 </div>
             </div>
 
             <div class="form-group">
-                <label>Temas Tecnológicos de Interés</label>
-                <div class="checkbox-group">
-                    <?php
-                    $temasOld = array_map('intval', $old['temas'] ?? []);
-                    foreach ($temasDisponibles as $tema):
-                        $checked = in_array((int) $tema['id_tema'], $temasOld, true) ? 'checked' : '';
-                    ?>
-                        <div class="checkbox-item">
-                            <input
-                                type="checkbox"
-                                id="tema_<?= (int) $tema['id_tema'] ?>"
-                                name="temas[]"
-                                value="<?= (int) $tema['id_tema'] ?>"
-                                <?= $checked ?>
-                            >
-                            <label for="tema_<?= (int) $tema['id_tema'] ?>" style="font-weight:400; margin:0;">
-                                <?= SecurityUtility::escapeOutput($tema['nombre']) ?>
-                            </label>
-                        </div>
+                <label for="pais_residencia_id">País de Residencia<span class="req">*</span></label>
+                <select id="pais_residencia_id" name="pais_residencia_id" required>
+                    <option value="">— Seleccione un país —</option>
+                    <?php foreach ($paises as $pais): ?>
+                        <option
+                            value="<?= (int) $pais['id'] ?>"
+                            <?= (int) ($old['pais_residencia_id'] ?? 0) === (int) $pais['id'] ? 'selected' : '' ?>>
+                            <?= htmlspecialchars($pais['nombre'], ENT_QUOTES, 'UTF-8') ?>
+                        </option>
                     <?php endforeach; ?>
+                </select>
+                <?= fieldError($errors, 'pais_residencia_id') ?>
+            </div>
+
+            <div class="form-group">
+    <label for="nacionalidad_id">
+        Nacionalidad <span class="req">*</span>
+    </label>
+
+    <select id="nacionalidad_id" name="nacionalidad_id" required>
+        <option value="">— Seleccione una nacionalidad —</option>
+
+        <?php foreach ($paises as $pais): ?>
+            <option
+                value="<?= (int)$pais['id'] ?>"
+                <?= (int)($old['nacionalidad_id'] ?? 0) === (int)$pais['id'] ? 'selected' : '' ?>>
+                <?= htmlspecialchars($pais['nombre'], ENT_QUOTES, 'UTF-8') ?>
+            </option>
+        <?php endforeach; ?>
+    </select>
+
+    <?= fieldError($errors, 'nacionalidad_id') ?>
+</div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="correo">Correo Electrónico <span class="req">*</span></label>
+                    <input type="email" id="correo" name="correo"
+                           value="<?= old($old, 'correo') ?>"
+                           placeholder="usuario@correo.com"
+                           required>
+                    <?= fieldError($errors, 'correo') ?>
                 </div>
-                <?php if (!empty($errors['temas'])): ?>
-                    <div class="field-error"><?= SecurityUtility::escapeOutput($errors['temas']) ?></div>
-                <?php endif; ?>
+
+                <div class="form-group">
+                    <label for="celular">Celular <span class="req">*</span></label>
+                    <input type="tel" id="celular" name="celular"
+                           value="<?= old($old, 'celular') ?>"
+                           placeholder="Ej: +507 6000-0000"
+                           required>
+                    <?= fieldError($errors, 'celular') ?>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="areas">
+                    Áreas de Interés Tecnológico <span class="req">*</span>
+                    <span class="hint">(Mantén Ctrl / Cmd para seleccionar varias)</span>
+                </label>
+                <?php
+                $areasOld = array_map('intval', $old['areas'] ?? []);
+                ?>
+                <select id="areas" name="areas[]" multiple required class="select-multiple">
+                    <?php foreach ($areas as $area): ?>
+                        <option
+                            value="<?= (int) $area['id'] ?>"
+                            <?= in_array((int) $area['id'], $areasOld, true) ? 'selected' : '' ?>>
+                            <?= htmlspecialchars($area['nombre'], ENT_QUOTES, 'UTF-8') ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
+                <?= fieldError($errors, 'areas') ?>
             </div>
 
             <div class="form-group">
                 <label for="observaciones">Observaciones</label>
-                <textarea id="observaciones" name="observaciones" maxlength="1000"><?= old($old, 'observaciones') ?></textarea>
-                <?php if (!empty($errors['observaciones'])): ?>
-                    <div class="field-error"><?= SecurityUtility::escapeOutput($errors['observaciones']) ?></div>
-                <?php endif; ?>
+                <textarea id="observaciones" name="observaciones"
+                          maxlength="1000"
+                          placeholder="Comentarios adicionales (opcional)..."><?= old($old, 'observaciones') ?></textarea>
             </div>
 
             <button type="submit" class="btn-submit">Enviar Inscripción</button>
+
         </form>
     </div>
 </main>

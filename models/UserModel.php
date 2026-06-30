@@ -1,11 +1,18 @@
 <?php
 /**
  * UserModel.php
- * Modelo encargado del acceso a datos de la tabla `inscriptores`
- * y su relación con `inscriptor_temas`.
+ * Modelo de acceso a datos para inscriptores, países y áreas de interés.
+ * La base de datos parcial_itech y sus tablas ya existen; este modelo
+ * solo consulta e inserta — nunca crea ni altera estructuras.
+ *
+ * Tablas que utiliza:
+ *   - inscriptores        (datos principales del inscriptor)
+ *   - paises              (catálogo para el <select> de país)
+ *   - areas_interes       (catálogo para el <select multiple> de áreas)
+ *   - inscriptor_temas    (relación N:M inscriptor ↔ área)
  */
 
-require_once __DIR__ . '/../models/Database.php';
+require_once __DIR__ . '/Database.php';
 
 class UserModel
 {
@@ -16,13 +23,54 @@ class UserModel
         $this->db = Database::getInstance()->getConnection();
     }
 
+    // ----------------------------------------------------------------
+    // Catálogos — datos para las listas desplegables
+    // ----------------------------------------------------------------
+
     /**
-     * Inserta un nuevo inscriptor junto con sus temas seleccionados.
-     * Usa una transacción para garantizar consistencia entre ambas tablas.
+     * Obtiene todos los países de la tabla `paises`, ordenados
+     * alfabéticamente, para construir el <select> en el formulario.
      *
-     * @param array $data  Datos ya validados y sanitizados del formulario.
-     * @return int         ID del inscriptor insertado.
-     * @throws Exception    Si ocurre un error en la inserción.
+     * @return array<int, array{id_pais: int, nombre: string}>
+     */
+    public function getPaises(): array
+    {
+        $stmt = $this->db->query(
+            "SELECT id, nombre FROM paises ORDER BY nombre ASC"
+        );
+        return $stmt->fetchAll();
+    }
+
+    /**
+     * Obtiene todas las áreas de interés de la tabla `areas_interes`,
+     * ordenadas alfabéticamente, para el <select multiple> del formulario.
+     *
+     * @return array<int, array{id_area: int, nombre: string}>
+     */
+    public function getAreasInteres(): array
+    {
+        $stmt = $this->db->query(
+            "SELECT id, nombre FROM areas_interes ORDER BY nombre ASC"
+        );
+        return $stmt->fetchAll();
+    }
+
+    // ----------------------------------------------------------------
+    // Inserción de inscriptores
+    // ----------------------------------------------------------------
+
+    /**
+     * Inserta un nuevo inscriptor y sus áreas de interés seleccionadas.
+     * Usa una transacción para mantener consistencia entre `inscriptores`
+     * e `inscriptor_temas`.
+     *
+     * @param array $data Datos ya validados y sanitizados del formulario.
+     *                    Estructura esperada:
+     *                    [nombre, apellido, edad, sexo, id_pais,
+     *                     nacionalidad, correo, celular, observaciones,
+     *                     areas (array de enteros)]
+     * @return int ID del inscriptor recién insertado.
+     * @throws Exception Si ocurre un error en la inserción o por duplicado.
      */
     public function insertUser(array $data): int
     {
@@ -30,38 +78,37 @@ class UserModel
             $this->db->beginTransaction();
 
             $sql = "INSERT INTO inscriptores
-                        (identidad, nombre, apellido, edad, sexo, pais_residencia,
-                         nacionalidad, correo, celular, observaciones)
+                        (nombre, apellido, edad, sexo, id_pais, nacionalidad,
+                         correo, celular, observaciones)
                     VALUES
-                        (:identidad, :nombre, :apellido, :edad, :sexo, :pais_residencia,
-                         :nacionalidad, :correo, :celular, :observaciones)";
+                        (:nombre, :apellido, :edad, :sexo, :id_pais, :nacionalidad,
+                         :correo, :celular, :observaciones)";
 
             $stmt = $this->db->prepare($sql);
             $stmt->execute([
-                ':identidad'        => $data['identidad'],
-                ':nombre'           => $data['nombre'],
-                ':apellido'         => $data['apellido'],
-                ':edad'             => (int) $data['edad'],
-                ':sexo'             => $data['sexo'],
-                ':pais_residencia'  => $data['pais_residencia'],
-                ':nacionalidad'     => $data['nacionalidad'],
-                ':correo'           => $data['correo'],
-                ':celular'          => $data['celular'],
-                ':observaciones'    => $data['observaciones'] ?? null,
+                ':nombre'        => $data['nombre'],
+                ':apellido'      => $data['apellido'],
+                ':edad'          => (int) $data['edad'],
+                ':sexo'          => $data['sexo'],
+                ':id_pais'       => (int) $data['id_pais'],
+                ':nacionalidad'  => $data['nacionalidad'] ?? null,
+                ':correo'        => $data['correo'],
+                ':celular'       => $data['celular'],
+                ':observaciones' => $data['observaciones'] ?? null,
             ]);
 
             $idInscriptor = (int) $this->db->lastInsertId();
 
-            // Relacionar temas seleccionados (tabla inscriptor_temas)
-            if (!empty($data['temas']) && is_array($data['temas'])) {
-                $sqlTema = "INSERT INTO inscriptor_temas (id_inscriptor, id_tema)
-                            VALUES (:id_inscriptor, :id_tema)";
-                $stmtTema = $this->db->prepare($sqlTema);
+            // Relacionar áreas de interés seleccionadas
+            if (!empty($data['areas']) && is_array($data['areas'])) {
+                $sqlArea = "INSERT INTO inscriptor_temas (id_inscriptor, id_area)
+                            VALUES (:id_inscriptor, :id_area)";
+                $stmtArea = $this->db->prepare($sqlArea);
 
-                foreach ($data['temas'] as $idTema) {
-                    $stmtTema->execute([
+                foreach ($data['areas'] as $idArea) {
+                    $stmtArea->execute([
                         ':id_inscriptor' => $idInscriptor,
-                        ':id_tema'       => (int) $idTema,
+                        ':id_area'       => (int) $idArea,
                     ]);
                 }
             }
@@ -72,61 +119,64 @@ class UserModel
         } catch (PDOException $e) {
             $this->db->rollBack();
 
-            // Error por duplicado (identidad o correo ya registrados)
+            // Código 23000 = Duplicate entry (correo/identidad repetida)
             if ((int) $e->getCode() === 23000) {
-                throw new Exception('Ya existe un registro con esa identidad o correo electrónico.');
+                throw new Exception('Ya existe un inscriptor registrado con ese correo electrónico.');
             }
 
             error_log('Error al insertar inscriptor: ' . $e->getMessage());
-            throw new Exception('Ocurrió un error al guardar el registro. Intente nuevamente.');
+            throw new Exception('Error al guardar el registro. Inténtelo nuevamente.');
         }
     }
 
+    // ----------------------------------------------------------------
+    // Lectura de inscriptores
+    // ----------------------------------------------------------------
+
     /**
-     * Obtiene todos los inscriptores registrados, junto con sus temas (opcional).
+     * Obtiene todos los inscriptores junto con su país y sus áreas
+     * de interés concatenadas por comas (para reporte y vista).
      *
-     * @return array Lista de inscriptores
+     * @return array
      */
     public function getUsers(): array
     {
-        try {
-            $sql = "SELECT id_inscriptor, identidad, nombre, apellido, edad, sexo,
-                           pais_residencia, nacionalidad, correo, celular,
-                           observaciones, fecha_registro
-                    FROM inscriptores
-                    ORDER BY fecha_registro DESC";
+        $sql = "SELECT
+                    i.id_inscriptor,
+                    i.nombre,
+                    i.apellido,
+                    i.edad,
+                    i.sexo,
+                    p.nombre  AS pais_residencia,
+                    i.correo,
+                    i.celular,
+                    GROUP_CONCAT(DISTINCT a.nombre ORDER BY a.nombre SEPARATOR ', ') AS areas,
+                    i.fecha_registro
+                FROM inscriptores i
+                LEFT JOIN paises p         ON p.id  = i.id
+                LEFT JOIN inscriptor_temas it ON it.id_inscriptor = i.id_inscriptor
+                LEFT JOIN areas_interes a  ON a.id  = it.id
+                GROUP BY
+                    i.id_inscriptor, i.nombre, i.apellido, i.edad, i.sexo,
+                    p.nombre, i.correo, i.celular, i.fecha_registro
+                ORDER BY i.fecha_registro DESC";
 
-            $stmt = $this->db->query($sql);
-            return $stmt->fetchAll();
-
-        } catch (PDOException $e) {
-            error_log('Error al obtener inscriptores: ' . $e->getMessage());
-            throw new Exception('No fue posible obtener la lista de registros.');
-        }
+        $stmt = $this->db->query($sql);
+        return $stmt->fetchAll();
     }
 
     /**
-     * Obtiene todos los temas tecnológicos disponibles para mostrarlos en el formulario.
+     * Verifica si ya existe un inscriptor con el correo indicado.
+     *
+     * @param string $correo Correo a verificar.
+     * @return bool
      */
-    public function getTemas(): array
+    public function existeCorreo(string $correo): bool
     {
-        try {
-            $stmt = $this->db->query("SELECT id_tema, nombre FROM temas ORDER BY nombre ASC");
-            return $stmt->fetchAll();
-        } catch (PDOException $e) {
-            error_log('Error al obtener temas: ' . $e->getMessage());
-            return [];
-        }
-    }
-
-    /**
-     * Verifica si ya existe un registro con la identidad o correo dados.
-     */
-    public function existsUser(string $identidad, string $correo): bool
-    {
-        $sql = "SELECT COUNT(*) FROM inscriptores WHERE identidad = :identidad OR correo = :correo";
-        $stmt = $this->db->prepare($sql);
-        $stmt->execute([':identidad' => $identidad, ':correo' => $correo]);
+        $stmt = $this->db->prepare(
+            "SELECT COUNT(*) FROM inscriptores WHERE correo = :correo"
+        );
+        $stmt->execute([':correo' => $correo]);
         return (int) $stmt->fetchColumn() > 0;
     }
 }
