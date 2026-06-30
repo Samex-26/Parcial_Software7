@@ -5,8 +5,8 @@
  * Flujo: CSRF -> Sanitización -> Validación -> Inserción -> Respuesta a la vista.
  */
 
-require_once __DIR__ . '/../utils/SecurityUtility.php';
-require_once __DIR__ . '/../utils/ValidationUtility.php';
+require_once __DIR__ . '/../utilities/SecurityUtility.php';
+require_once __DIR__ . '/../utilities/ValidationUtility.php';
 require_once __DIR__ . '/../models/UserModel.php';
 
 class FormController

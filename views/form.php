@@ -1,11 +1,8 @@
 <?php
 /**
- * form.php
- * Vista principal: formulario de inscripción a temas tecnológicos iTECH.
- * Este archivo actúa como punto de entrada (front controller simplificado):
- * recibe el POST, lo delega al FormController y luego renderiza el resultado.
+ * form.php (Versión Combinada - PHP arriba, HTML abajo)
+ * Vista principal y diseño incrustado.
  */
-
 require_once __DIR__ . '/../controllers/FormController.php';
 require_once __DIR__ . '/../models/UserModel.php';
 require_once __DIR__ . '/../utilities/SecurityUtility.php';
@@ -27,12 +24,11 @@ $old    = $result['old'];
 $temasDisponibles = $userModel->getTemas();
 $csrfToken = SecurityUtility::generateCsrfToken();
 
-/**
- * Helper local para reimprimir valores anteriores de forma segura (escapados).
- */
-function old(array $old, string $key): string
-{
-    return SecurityUtility::escapeOutput($old[$key] ?? '');
+if (!function_exists('old')) {
+    function old(array $old, string $key): string
+    {
+        return SecurityUtility::escapeOutput($old[$key] ?? '');
+    }
 }
 ?>
 <!DOCTYPE html>
@@ -41,7 +37,176 @@ function old(array $old, string $key): string
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Inscripción - iTECH</title>
-    <link rel="stylesheet" href="style.css">
+    <style>
+        /* ===========================================================
+           Estilos integrados del formulario de inscripción iTECH
+           =========================================================== */
+        :root {
+            --color-primary: #0d6efd;
+            --color-primary-dark: #0b5ed7;
+            --color-secondary: #6c757d;
+            --color-success: #198754;
+            --color-error: #dc3545;
+            --color-bg: #f4f6f9;
+            --color-card: #ffffff;
+            --color-text: #212529;
+            --color-border: #ced4da;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            font-family: 'Segoe UI', Arial, sans-serif;
+            background-color: var(--color-bg);
+            color: var(--color-text);
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+
+        header.site-header {
+            background-color: var(--color-primary);
+            color: #fff;
+            padding: 1.5rem 1rem;
+            text-align: center;
+        }
+
+        header.site-header h1 {
+            margin: 0;
+            font-size: 1.6rem;
+        }
+
+        main {
+            flex: 1;
+            display: flex;
+            justify-content: center;
+            padding: 2rem 1rem;
+        }
+
+        .form-card {
+            background-color: var(--color-card);
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+            padding: 2rem;
+            width: 100%;
+            max-width: 700px;
+        }
+
+        .form-card h2 {
+            margin-top: 0;
+            color: var(--color-primary);
+            border-bottom: 2px solid var(--color-primary);
+            padding-bottom: 0.5rem;
+        }
+
+        .form-group {
+            margin-bottom: 1.1rem;
+        }
+
+        .form-group label {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 0.3rem;
+        }
+
+        .form-group input[type="text"],
+        .form-group input[type="number"],
+        .form-group input[type="email"],
+        .form-group input[type="tel"],
+        .form-group select,
+        .form-group textarea {
+            width: 100%;
+            padding: 0.55rem 0.7rem;
+            border: 1px solid var(--color-border);
+            border-radius: 6px;
+            font-size: 0.95rem;
+        }
+
+        .form-group textarea {
+            resize: vertical;
+            min-height: 90px;
+        }
+
+        .form-row {
+            display: flex;
+            gap: 1rem;
+        }
+
+        .form-row .form-group {
+            flex: 1;
+        }
+
+        .checkbox-group {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 0.4rem 1rem;
+            border: 1px solid var(--color-border);
+            border-radius: 6px;
+            padding: 0.8rem;
+        }
+
+        .checkbox-item {
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+        }
+
+        .checkbox-item input {
+            width: auto;
+        }
+
+        .field-error {
+            color: var(--color-error);
+            font-size: 0.82rem;
+            margin-top: 0.25rem;
+        }
+
+        .alert {
+            padding: 0.8rem 1rem;
+            border-radius: 6px;
+            margin-bottom: 1rem;
+            font-size: 0.95rem;
+        }
+
+        .alert-success {
+            background-color: #d1e7dd;
+            color: var(--color-success);
+            border: 1px solid #badbcc;
+        }
+
+        .alert-error {
+            background-color: #f8d7da;
+            color: var(--color-error);
+            border: 1px solid #f5c2c7;
+        }
+
+        .btn-submit {
+            background-color: var(--color-primary);
+            color: #fff;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 6px;
+            font-size: 1rem;
+            cursor: pointer;
+            width: 100%;
+            transition: background-color 0.2s ease-in-out;
+        }
+
+        .btn-submit:hover {
+            background-color: var(--color-primary-dark);
+        }
+
+        footer.site-footer {
+            background-color: #212529;
+            color: #ced4da;
+            text-align: center;
+            padding: 1rem;
+            font-size: 0.85rem;
+        }
+    </style>
 </head>
 <body>
 
@@ -68,7 +233,6 @@ function old(array $old, string $key): string
         <form method="POST" action="form.php" novalidate>
             <input type="hidden" name="csrf_token" value="<?= SecurityUtility::escapeOutput($csrfToken) ?>">
 
-            <!-- Identidad -->
             <div class="form-group">
                 <label for="identidad">Identidad / Cédula</label>
                 <input type="text" id="identidad" name="identidad" value="<?= old($old, 'identidad') ?>" required>
@@ -77,7 +241,6 @@ function old(array $old, string $key): string
                 <?php endif; ?>
             </div>
 
-            <!-- Nombre y apellido -->
             <div class="form-row">
                 <div class="form-group">
                     <label for="nombre">Nombre</label>
@@ -95,7 +258,6 @@ function old(array $old, string $key): string
                 </div>
             </div>
 
-            <!-- Edad y sexo -->
             <div class="form-row">
                 <div class="form-group">
                     <label for="edad">Edad</label>
@@ -119,7 +281,6 @@ function old(array $old, string $key): string
                 </div>
             </div>
 
-            <!-- País de residencia y nacionalidad -->
             <div class="form-row">
                 <div class="form-group">
                     <label for="pais_residencia">País de Residencia</label>
@@ -137,7 +298,6 @@ function old(array $old, string $key): string
                 </div>
             </div>
 
-            <!-- Correo y celular -->
             <div class="form-row">
                 <div class="form-group">
                     <label for="correo">Correo Electrónico</label>
@@ -155,7 +315,6 @@ function old(array $old, string $key): string
                 </div>
             </div>
 
-            <!-- Temas tecnológicos -->
             <div class="form-group">
                 <label>Temas Tecnológicos de Interés</label>
                 <div class="checkbox-group">
@@ -183,7 +342,6 @@ function old(array $old, string $key): string
                 <?php endif; ?>
             </div>
 
-            <!-- Observaciones -->
             <div class="form-group">
                 <label for="observaciones">Observaciones</label>
                 <textarea id="observaciones" name="observaciones" maxlength="1000"><?= old($old, 'observaciones') ?></textarea>

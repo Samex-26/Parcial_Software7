@@ -5,7 +5,7 @@
  * y su relación con `inscriptor_temas`.
  */
 
-require_once __DIR__ . '/../config/Database.php';
+require_once __DIR__ . '/../models/Database.php';
 
 class UserModel
 {

@@ -11,7 +11,7 @@ class Database
     private ?PDO $conn = null;
 
     // ---- Configuración de conexión ----
-    private string $host   = '127.0.0.1';
+    private string $host   = 'localhost';
     private string $dbname = 'parcial_itech';
     private string $user   = 'root';
     private string $pass   = '';
