@@ -115,6 +115,69 @@ class ReportController
 
         return $filename;
     }
+
+    /**
+     * Genera el reporte en un archivo .xlsx temporal (fuera del proyecto)
+     * y lo envía directamente al navegador como descarga (Content-Disposition:
+     * attachment). El navegador la guarda en la carpeta de Descargas del
+     * usuario; el archivo NUNCA queda almacenado dentro del proyecto.
+     */
+    public function downloadExcel(): void
+    {
+        $data = $this->buildReport();
+        $exporter = new ExcelExporter();
+
+        $headers = ['ID', 'Nombre', 'Apellido', 'Edad', 'Sexo', 'Correo', 'Celular',
+            'País Residencia', 'Nacionalidad', 'Temas', 'Auditoría'];
+
+        $rows = array_map(function ($r) {
+            return [
+                $r['id'],
+                $r['nombre'],
+                $r['apellido'],
+                $r['edad'],
+                $r['sexo'],
+                $r['correo'],
+                $r['celular'],
+                $r['pais_residencia'] ?? '',
+                $r['nacionalidad'] ?? '',
+                $r['temas'] ?? '',
+                $r['audit_status'] === 'green' ? 'Válido' : 'Comprometido',
+            ];
+        }, $data);
+
+        $filename = 'reporte_inscriptores_' . date('Ymd_His') . '.xlsx';
+
+        // Ruta temporal FUERA del proyecto (carpeta temp del sistema/servidor)
+        $tempPath = tempnam(sys_get_temp_dir(), 'itech_xlsx_');
+        if ($tempPath === false) {
+            throw new Exception('No se pudo crear el archivo temporal para exportar.');
+        }
+        // tempnam() no agrega extensión; ZipArchive/Excel esperan .xlsx
+        $tempXlsx = $tempPath . '.xlsx';
+        rename($tempPath, $tempXlsx);
+
+        $ok = $exporter->export($headers, $rows, $tempXlsx);
+
+        if (!$ok || !file_exists($tempXlsx)) {
+            throw new Exception('No se pudo generar el archivo Excel.');
+        }
+
+        // Limpiar cualquier salida previa (evita corromper el binario del xlsx)
+        while (ob_get_level() > 0) {
+            ob_end_clean();
+        }
+
+        header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        header('Content-Disposition: attachment; filename="' . $filename . '"');
+        header('Content-Length: ' . filesize($tempXlsx));
+        header('Cache-Control: max-age=0');
+        header('Pragma: public');
+
+        readfile($tempXlsx);
+        unlink($tempXlsx);
+        exit;
+    }
 }
 
 // ---- Manejo de la petición (cuando se accede directamente vía router) ----
@@ -122,8 +185,7 @@ if (basename($_SERVER['SCRIPT_FILENAME']) === basename(__FILE__)) {
     $controller = new ReportController();
 
     if (isset($_GET['export']) && $_GET['export'] === 'excel') {
-        $file = $controller->exportToExcel();
-        echo "Archivo generado: reports/{$file}";
+        $controller->downloadExcel();
         exit;
     }
 

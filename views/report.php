@@ -90,8 +90,15 @@ require_once __DIR__ . '/../utilities/ValidationUtility.php';
     <p class="subtitle">Base de datos: parcial_itech</p>
 
     <div class="actions">
-        <a class="btn-export" href="?export=excel">⬇ Exportar a Excel</a>
+        <a class="btn-export" href="index.php?action=form" style="background:#1a3c6e; margin-right:10px;">← Volver al formulario</a>
+        <a class="btn-export" href="index.php?action=report&exportar=1">⬇ Exportar a Excel</a>
     </div>
+
+    <?php if (!empty($exportMsg)): ?>
+        <div class="subtitle" style="color:#1e8449; font-weight:600;">
+            <?= ValidationUtility::sanitize($exportMsg) ?>
+        </div>
+    <?php endif; ?>
 
     <?php if (empty($data)): ?>
         <div class="empty">No hay inscriptores registrados.</div>

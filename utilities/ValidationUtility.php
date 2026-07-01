@@ -204,12 +204,12 @@ class ValidationUtility
             $errors['sexo'] = 'Seleccione un sexo válido (Masculino, Femenino, Otro).';
         }
 
-        if (empty($data['pais_residencia']) || !self::isValidPais($data['pais_residencia'])) {
-            $errors['pais_residencia'] = 'El país de residencia no es válido.';
+        if (empty($data['pais_residencia_id']) || !is_numeric($data['pais_residencia_id']) || (int) $data['pais_residencia_id'] <= 0) {
+            $errors['pais_residencia_id'] = 'El país de residencia no es válido.';
         }
 
-        if (empty($data['nacionalidad']) || !self::isValidPais($data['nacionalidad'])) {
-            $errors['nacionalidad'] = 'La nacionalidad no es válida.';
+        if (empty($data['nacionalidad_id']) || !is_numeric($data['nacionalidad_id']) || (int) $data['nacionalidad_id'] <= 0) {
+            $errors['nacionalidad_id'] = 'La nacionalidad no es válida.';
         }
 
         if (empty($data['correo']) || !self::isValidCorreo($data['correo'])) {
@@ -220,8 +220,8 @@ class ValidationUtility
             $errors['celular'] = 'El número de celular no es válido.';
         }
 
-        if (!self::isValidTemas($data['temas'] ?? null)) {
-            $errors['temas'] = 'Seleccione al menos un tema tecnológico.';
+        if (!self::isValidAreas($data['areas'] ?? null)) {
+            $errors['areas'] = 'Seleccione al menos un área de interés.';
         }
 
         if (isset($data['observaciones']) && !self::isValidObservaciones($data['observaciones'])) {
@@ -229,22 +229,6 @@ class ValidationUtility
         }
 
         // ---- ✚ Bloques nuevos (opcionales, no afectan formularios existentes) ----
-
-        // Valida ID de país cuando el formulario usa <select> dinámico (tabla paises).
-        // Solo se activa si la clave 'id_pais' está presente en $data.
-        if (array_key_exists('id_pais', $data)) {
-            if (empty($data['id_pais']) || !is_numeric($data['id_pais']) || (int) $data['id_pais'] <= 0) {
-                $errors['id_pais'] = 'Seleccione un país de residencia válido.';
-            }
-        }
-
-        // Valida áreas de interés cuando el formulario usa <select multiple> (tabla areas_interes).
-        // Solo se activa si la clave 'areas' está presente en $data.
-        if (array_key_exists('areas', $data)) {
-            if (!self::isValidAreas($data['areas'])) {
-                $errors['areas'] = 'Seleccione al menos un área de interés.';
-            }
-        }
 
         return $errors;
     }

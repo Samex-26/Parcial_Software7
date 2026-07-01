@@ -78,37 +78,37 @@ class UserModel
             $this->db->beginTransaction();
 
             $sql = "INSERT INTO inscriptores
-                        (nombre, apellido, edad, sexo, id_pais, nacionalidad,
+                        (nombre, apellido, edad, sexo, pais_residencia_id, nacionalidad_id,
                          correo, celular, observaciones)
                     VALUES
-                        (:nombre, :apellido, :edad, :sexo, :id_pais, :nacionalidad,
+                        (:nombre, :apellido, :edad, :sexo, :pais_residencia_id, :nacionalidad_id,
                          :correo, :celular, :observaciones)";
 
             $stmt = $this->db->prepare($sql);
             $stmt->execute([
-                ':nombre'        => $data['nombre'],
-                ':apellido'      => $data['apellido'],
-                ':edad'          => (int) $data['edad'],
-                ':sexo'          => $data['sexo'],
-                ':id_pais'       => (int) $data['id_pais'],
-                ':nacionalidad'  => $data['nacionalidad'] ?? null,
-                ':correo'        => $data['correo'],
-                ':celular'       => $data['celular'],
-                ':observaciones' => $data['observaciones'] ?? null,
+                ':nombre'             => $data['nombre'],
+                ':apellido'           => $data['apellido'],
+                ':edad'               => (int) $data['edad'],
+                ':sexo'               => $data['sexo'],
+                ':pais_residencia_id' => (int) $data['pais_residencia_id'],
+                ':nacionalidad_id'    => (int) $data['nacionalidad_id'],
+                ':correo'             => $data['correo'],
+                ':celular'            => $data['celular'],
+                ':observaciones'      => $data['observaciones'] ?? null,
             ]);
 
             $idInscriptor = (int) $this->db->lastInsertId();
 
             // Relacionar áreas de interés seleccionadas
             if (!empty($data['areas']) && is_array($data['areas'])) {
-                $sqlArea = "INSERT INTO inscriptor_temas (id_inscriptor, id_area)
-                            VALUES (:id_inscriptor, :id_area)";
+                $sqlArea = "INSERT INTO inscriptor_temas (inscriptor_id, area_interes_id)
+                            VALUES (:inscriptor_id, :area_interes_id)";
                 $stmtArea = $this->db->prepare($sqlArea);
 
                 foreach ($data['areas'] as $idArea) {
                     $stmtArea->execute([
-                        ':id_inscriptor' => $idInscriptor,
-                        ':id_area'       => (int) $idArea,
+                        ':inscriptor_id'   => $idInscriptor,
+                        ':area_interes_id' => (int) $idArea,
                     ]);
                 }
             }
@@ -142,23 +142,25 @@ class UserModel
     public function getUsers(): array
     {
         $sql = "SELECT
-                    i.id_inscriptor,
+                    i.id AS id_inscriptor,
                     i.nombre,
                     i.apellido,
                     i.edad,
                     i.sexo,
                     p.nombre  AS pais_residencia,
+                    n.nombre  AS nacionalidad,
                     i.correo,
                     i.celular,
                     GROUP_CONCAT(DISTINCT a.nombre ORDER BY a.nombre SEPARATOR ', ') AS areas,
                     i.fecha_registro
                 FROM inscriptores i
-                LEFT JOIN paises p         ON p.id  = i.id
-                LEFT JOIN inscriptor_temas it ON it.id_inscriptor = i.id_inscriptor
-                LEFT JOIN areas_interes a  ON a.id  = it.id
+                LEFT JOIN paises p             ON p.id = i.pais_residencia_id
+                LEFT JOIN paises n              ON n.id = i.nacionalidad_id
+                LEFT JOIN inscriptor_temas it   ON it.inscriptor_id = i.id
+                LEFT JOIN areas_interes a       ON a.id = it.area_interes_id
                 GROUP BY
-                    i.id_inscriptor, i.nombre, i.apellido, i.edad, i.sexo,
-                    p.nombre, i.correo, i.celular, i.fecha_registro
+                    i.id, i.nombre, i.apellido, i.edad, i.sexo,
+                    p.nombre, n.nombre, i.correo, i.celular, i.fecha_registro
                 ORDER BY i.fecha_registro DESC";
 
         $stmt = $this->db->query($sql);

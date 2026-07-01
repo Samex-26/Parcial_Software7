@@ -81,17 +81,16 @@ if ($action === 'report') {
     require_once __DIR__ . '/controllers/ReportController.php';
     $controller = new ReportController();
 
-    // Exportar a Excel si se solicita
+    // Descargar Excel directamente al navegador (no se guarda en el proyecto)
     if (isset($_GET['exportar']) && $_GET['exportar'] === '1') {
         try {
-            $rutaArchivo = $controller->exportarExcel();
-            $exportMsg = 'Archivo generado: ' . basename($rutaArchivo);
+            $controller->downloadExcel(); // envía headers + archivo y termina con exit
         } catch (Throwable $e) {
             $exportMsg = 'Error al exportar: ' . $e->getMessage();
         }
     }
 
-    $reporte   = $controller->generarReporte();
+    $data      = $controller->buildReport();
     $exportMsg = $exportMsg ?? null;
     require __DIR__ . '/views/report.php';
     exit;
